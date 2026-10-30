@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   FaDownload, FaSpinner, FaGoogle, FaImages, FaEye, FaCut, FaPlus, FaTrashAlt
@@ -9,6 +10,7 @@ import {
 
 export default function GalleryPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [creations, setCreations] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -96,13 +98,18 @@ export default function GalleryPage() {
           <p className="text-sm text-zinc-400 leading-relaxed mb-8">
             Please sign in to access your HD gallery, view detail comparisons, and download simulated haircuts.
           </p>
-          <button
-            onClick={() => signIn("google")}
+          {/* Send everyone to the login page rather than straight into Google,
+              so the email and API-key options are reachable too. */}
+          <Link
+            href="/login"
             className="w-full flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-xl text-sm font-extrabold text-white bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 shadow-lg shadow-violet-500/10 active:scale-[0.98] transition-all cursor-pointer"
           >
             <FaGoogle className="text-xs" />
-            <span>Sign in with Google</span>
-          </button>
+            <span>Sign in or create an account</span>
+          </Link>
+          <p className="mt-3 text-xs text-zinc-500">
+            Google, email address, or MuAPI key.
+          </p>
         </div>
       </div>
     );

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import {
   FaUpload, FaSpinner, FaMagic, FaDownload,
   FaCut, FaCoins, FaCheck, FaExclamationTriangle, FaTimes, FaChevronDown
@@ -41,6 +42,7 @@ const HAIR_COLORS = [
 
 export default function StudioPage() {
   const { data: session, update: updateSession } = useSession();
+  const router = useRouter();
 
   // Inputs
   const [inputImage, setInputImage] = useState("");
@@ -125,6 +127,15 @@ export default function StudioPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Uploading spends the server's image-generation quota, so the endpoint
+    // requires a signed-in user. Send them to the login page, which offers
+    // Google, email and API-key sign-in — jumping straight to Google would
+    // hide the other two.
+    if (!session?.user) {
+      router.push("/login");
+      return;
+    }
+
     setIsUploading(true);
     const formData = new FormData();
     formData.append("file", file);
@@ -134,13 +145,16 @@ export default function StudioPage() {
         method: "POST",
         body: formData
       });
-      if (!res.ok) throw new Error("Upload failed");
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || "Upload failed");
+      }
       const data = await res.json();
       setInputImage(data.url);
       setResultImage("");
     } catch (err) {
       console.error(err);
-      alert("Failed to upload image. Please try again.");
+      alert(err.message || "Failed to upload image. Please try again.");
     } finally {
       setIsUploading(false);
     }
@@ -148,7 +162,7 @@ export default function StudioPage() {
 
   const handleGenerate = async () => {
     if (!session?.user) {
-      signIn("google");
+      router.push("/login");
       return;
     }
 
@@ -176,7 +190,10 @@ export default function StudioPage() {
       });
 
       if (res.status === 402) {
-        setGeneratingError("Insufficient credits. Please purchase a credit pack on the pricing page.");
+        const body = await res.json().catch(() => null);
+        setGeneratingError(
+          body?.error || "Insufficient credits. Please purchase a credit pack on the pricing page."
+        );
         setGeneratingStatus("error");
         return;
       }
