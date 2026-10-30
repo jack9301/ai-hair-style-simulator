@@ -1,0 +1,14 @@
+# Cloudflare `wrangler dev` secrets — copy to `.dev.vars` (gitignored) and fill in.
+# These mirror what you'll set with `wrangler secret put <NAME>` for production.
+DATABASE_URL="postgresql://postgres.PROJECT_REF:YOUR_DB_PASSWORD@aws-1-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require"
+NEXTAUTH_SECRET=replace-with-`openssl-rand-base64-32`-output
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+MUAPIAPP_API_KEY=
+
+# Public URLs (set in wrangler.jsonc as `vars` for prod; safe to override here for local).
+# NEXTAUTH_URL=http://localhost:3000
+# WEBHOOK_URL=http://localhost:3000
