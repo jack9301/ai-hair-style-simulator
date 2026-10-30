@@ -3,6 +3,10 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../../lib/auth";
 import { BillingService } from "../../../../lib/services/billing";
 
+// Stripe SDK relies on Node APIs (crypto, http) under the hood; pin to Node runtime.
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function POST(req) {
   try {
     const session = await getServerSession(authOptions);
