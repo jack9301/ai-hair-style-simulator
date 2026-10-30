@@ -1,6 +1,8 @@
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]
+  // `native` is for local dev; the Workers-compatible binaries cover Cloudflare Pages
+  // (rhel-openssl-3.0.x matches the Linux runtime Cloudflare uses).
+  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -41,6 +43,10 @@ model User {
   image         String?
   credits       Int           @default(10)
   customApiKey  String?       @db.Text
+  /// PBKDF2 hash of the password for email/password accounts, in the
+  /// self-describing form `pbkdf2-sha256$<iterations>$<salt>$<hash>`.
+  /// Null for accounts that signed in with Google or an API key.
+  password      String?       @db.Text
   accounts      Account[]
   sessions      Session[]
   hairstyles    HairStyle[]

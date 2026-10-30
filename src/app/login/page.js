@@ -3,7 +3,7 @@
 import { signIn, useSession } from "next-auth/react";
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FaGoogle, FaKey, FaInfoCircle, FaArrowRight } from "react-icons/fa";
+import { FaGoogle, FaKey, FaInfoCircle, FaArrowRight, FaEnvelope } from "react-icons/fa";
 import toast, { Toaster } from "react-hot-toast";
 
 function LoginContent() {
@@ -12,8 +12,11 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const next = searchParams.get("callbackUrl") || searchParams.get("next") || "/";
 
-  const [activeTab, setActiveTab] = useState("google"); // "google" | "apikey"
+  const [activeTab, setActiveTab] = useState("google"); // "google" | "email" | "apikey"
   const [apiKeyInput, setApiKeyInput] = useState("");
+  const [emailInput, setEmailInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
+  const [emailMode, setEmailMode] = useState("signin"); // "signin" | "signup"
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -56,6 +59,57 @@ function LoginContent() {
     }
   };
 
+  const handleEmailAuth = async (e) => {
+    e.preventDefault();
+    const email = emailInput.trim();
+    const password = passwordInput;
+
+    if (!email || !email.includes("@")) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+    if (!password) {
+      toast.error("Please enter your password");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      if (emailMode === "signup") {
+        const res = await fetch("/api/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast.error(data?.error || "Failed to create the account");
+          return;
+        }
+        toast.success("Account created! Signing you in...");
+      }
+
+      const res = await signIn("email", {
+        email,
+        password,
+        redirect: false,
+        callbackUrl: next,
+      });
+
+      if (res?.error) {
+        toast.error(res.error || "Failed to sign in");
+      } else {
+        toast.success("Signed in successfully!");
+        router.push(next);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("An error occurred during email authentication");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-dvh flex items-center justify-center bg-bg-page px-6 text-primary-text select-none">
       <Toaster position="top-right" />
@@ -66,7 +120,7 @@ function LoginContent() {
           </div>
           <h2 className="text-2xl font-black uppercase tracking-tight">Sign In to Studio</h2>
           <p className="text-xs font-semibold text-secondary-text leading-relaxed px-2">
-            Choose your preferred sign-in method: Google Account or custom MuAPI Key.
+            Choose your preferred sign-in method: Google Account, Email, or a custom MuAPI Key.
           </p>
         </div>
 
@@ -82,7 +136,20 @@ function LoginContent() {
             }`}
           >
             <FaGoogle className="text-red-400" />
-            <span>Google Account</span>
+            <span>Google</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("email")}
+            className={`flex-1 py-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+              activeTab === "email"
+                ? "bg-bg-card text-white shadow-sm border border-divider/40"
+                : "text-secondary-text hover:text-white"
+            }`}
+          >
+            <FaEnvelope className="text-primary" />
+            <span>Email</span>
           </button>
 
           <button
@@ -95,7 +162,7 @@ function LoginContent() {
             }`}
           >
             <FaKey className="text-amber-400" />
-            <span>Use API Key</span>
+            <span>API Key</span>
           </button>
         </div>
 
@@ -109,10 +176,138 @@ function LoginContent() {
               <FaGoogle className="text-sm text-red-500" />
               <span>Continue with Google</span>
             </button>
+
+            {/* Email sign-up is offered on its own tab, but a visitor who
+                lands here should not have to go looking for it. */}
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-divider/60" />
+              <span className="text-[10px] uppercase font-bold text-secondary-text tracking-wider">
+                or
+              </span>
+              <div className="h-px flex-1 bg-divider/60" />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("email");
+                setEmailMode("signup");
+              }}
+              className="w-full py-3 bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary rounded-full text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <FaEnvelope className="text-xs" />
+              <span>Create an account with email</span>
+            </button>
+
             <p className="text-[11px] text-center text-secondary-text">
               Uses system credit balance. Ideal for credit pack purchases.
             </p>
           </div>
+        ) : activeTab === "email" ? (
+          <form onSubmit={handleEmailAuth} className="space-y-4 pt-2">
+            {/* Sign in / create-account switch at the top of the form, so the
+                sign-up path is visible without scrolling to the link below. */}
+            <div className="flex bg-bg-page p-1 rounded-lg border border-divider/60">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailMode("signin");
+                  setPasswordInput("");
+                }}
+                className={`flex-1 py-2 rounded-md text-xs font-bold transition-all ${
+                  emailMode === "signin"
+                    ? "bg-bg-card text-white shadow-sm border border-divider/40"
+                    : "text-secondary-text hover:text-white"
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailMode("signup");
+                  setPasswordInput("");
+                }}
+                className={`flex-1 py-2 rounded-md text-xs font-bold transition-all ${
+                  emailMode === "signup"
+                    ? "bg-bg-card text-white shadow-sm border border-divider/40"
+                    : "text-secondary-text hover:text-white"
+                }`}
+              >
+                Create Account
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              <label
+                htmlFor="email"
+                className="block text-[11px] uppercase font-bold text-secondary-text tracking-wider"
+              >
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full bg-bg-page border border-divider rounded-lg px-3.5 py-2.5 text-xs text-white placeholder-secondary-text/50 focus:outline-none focus:border-primary transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label
+                htmlFor="password"
+                className="block text-[11px] uppercase font-bold text-secondary-text tracking-wider"
+              >
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                autoComplete={emailMode === "signup" ? "new-password" : "current-password"}
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                placeholder={emailMode === "signup" ? "At least 8 characters" : "••••••••"}
+                className="w-full bg-bg-page border border-divider rounded-lg px-3.5 py-2.5 text-xs text-white placeholder-secondary-text/50 focus:outline-none focus:border-primary transition-colors"
+              />
+              {emailMode === "signup" && (
+                <p className="text-[10px] text-secondary-text leading-relaxed">
+                  At least 8 characters. Longer beats complicated — avoid passwords
+                  other people use.
+                </p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting || !emailInput.trim() || !passwordInput}
+              className="w-full py-3 bg-primary hover:bg-primary/90 text-white rounded-full text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <span>
+                {isSubmitting
+                  ? "Please wait..."
+                  : emailMode === "signup"
+                    ? "Create Account"
+                    : "Sign In"}
+              </span>
+              <FaArrowRight className="text-xs" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setEmailMode(emailMode === "signup" ? "signin" : "signup");
+                setPasswordInput("");
+              }}
+              className="w-full text-center text-[11px] text-primary hover:underline font-semibold cursor-pointer"
+            >
+              {emailMode === "signup"
+                ? "Already have an account? Sign in"
+                : "Need an account? Create one"}
+            </button>
+          </form>
         ) : (
           <form onSubmit={handleApiKeyLogin} className="space-y-4 pt-2">
             <div className="space-y-1.5">
