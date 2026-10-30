@@ -1,6 +1,7 @@
 // Prisma CLI config. `dotenv/config` is loaded here ONLY for the local Prisma CLI
-// (it reads .env from the project root). Cloudflare Workers does not bundle this file —
-// at deploy time it uses wrangler secrets/bindings instead. Safe to keep.
+// (it reads .env from the project root). The deployed app never bundles this file —
+// it gets its connection string from the platform's environment variables. Safe to
+// keep.
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 import { toSessionPoolerUrl } from "./src/lib/db-url.js";

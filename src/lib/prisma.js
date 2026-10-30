@@ -5,9 +5,6 @@ import { stripSslMode } from "./db-url";
 
 const globalForPrisma = globalThis;
 
-// On Cloudflare Workers, env vars arrive via the `process.env` shim injected by OpenNext.
-// We log a single warning if the URL is missing rather than crashing the build.
-//
 // The `sslmode=require` that Supabase's dashboard puts in the URL is stripped
 // here: see src/lib/db-url.js for why it no longer means "encrypt but don't
 // verify". The equivalent behaviour is requested through the `ssl` option on
@@ -36,10 +33,12 @@ const pool = new Pool({
   // To verify properly, download Supabase's CA certificate and set `sslrootcert`
   // in DATABASE_URL; `ssl` can then be dropped.
   ssl: { rejectUnauthorized: false },
-  // Cloudflare Workers + node-postgres: keep the pool tight (Workers request lifetime
-  // is short, and connections that linger get torn down).
-  max: 1,
-  idleTimeoutMillis: 5_000,
+  // A Vercel function instance handles requests concurrently, so the pool has to
+  // hold more than one connection — a pool of 1 would serialise every query
+  // behind the last one. The connection string points at Supabase's transaction
+  // pooler, which multiplexes these over a single Postgres backend.
+  max: 10,
+  idleTimeoutMillis: 10_000,
 });
 
 const adapter = new PrismaPg(pool);

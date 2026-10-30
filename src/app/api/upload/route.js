@@ -4,7 +4,7 @@ import { authOptions } from "../../../lib/auth";
 import config from "../../../lib/config";
 import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES } from "../../../lib/security";
 
-// Uses `Buffer.from(...)` which is a Node API; pin to Node runtime for Cloudflare.
+// Uses `Buffer.from(...)` which is a Node API; pin to the Node runtime.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 

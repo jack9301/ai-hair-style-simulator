@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, normalizeEmail, validatePassword } from "@/lib/password";
 
-// Prisma + pg need Node APIs on Cloudflare.
+// Prisma + pg need Node APIs; pin the route to the Node runtime.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 

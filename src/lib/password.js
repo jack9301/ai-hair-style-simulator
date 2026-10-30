@@ -8,7 +8,7 @@
  *    the Edge runtime, and Cloudflare Workers. There is no native addon to
  *    compile and nothing to bundle per platform.
  *  - The PBKDF2 work runs natively, so it does not burn the CPU budget that
- *    Cloudflare Workers meters per request the way a pure-JS bcrypt would.
+ *    serverless platforms meter per request the way a pure-JS bcrypt would.
  *
  * The encoded form is self-describing, so the work factor can be raised later
  * without invalidating existing passwords:
@@ -29,10 +29,11 @@ const LABEL = "pbkdf2-sha256";
  * Work factor.
  *
  * OWASP currently suggests 600,000 iterations for PBKDF2-HMAC-SHA256. This is
- * deliberately lower: the same work has to fit inside the CPU budget Cloudflare
- * Workers meters per request, and hashing runs on every sign-in. Raise it here
- * when the deployment can afford it — existing passwords keep working and are
- * re-hashed with the new factor the next time their owner signs in.
+ * deliberately lower: the same work has to fit inside the CPU budget a
+ * serverless function meters per request, and hashing runs on every sign-in.
+ * Raise it here when the deployment can afford it — existing passwords keep
+ * working and are re-hashed with the new factor the next time their owner
+ * signs in.
  */
 export const PBKDF2_ITERATIONS = 210_000;
 

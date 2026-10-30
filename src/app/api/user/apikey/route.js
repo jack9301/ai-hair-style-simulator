@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-// Prisma + pg need Node APIs on Cloudflare.
+// Prisma + pg need Node APIs; pin the route to the Node runtime.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 

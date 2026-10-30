@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { BillingService } from "../../../../lib/services/billing";
 
 // Stripe webhook signature verification uses Node `crypto`; pin to the Node runtime
-// so it survives the Cloudflare Workers Edge / V8 default.
+// so it always has access to Node crypto.
 export const runtime = "nodejs";
 // Webhooks must never be cached.
 export const dynamic = "force-dynamic";

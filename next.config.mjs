@@ -1,13 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // OpenNext Cloudflare builds the standalone output itself; keep Next defaults otherwise.
-  // The build output is consumed by `opennextjs-cloudflare build`, not `next start`.
   images: {
-    // All <img> usage in this project uses raw <img> tags (eslint-disabled).
-    // Keep Next image optimization OFF so Cloudflare can serve CDN assets directly
-    // without needing a loader. Re-enable with `unoptimized: false` and a Cloudflare
-    // Images loader if you decide to migrate to next/image.
-    unoptimized: true,
+    // The app renders raw <img> tags today, so this only takes effect if it
+    // ever switches to next/image. Listed anyway so the hosts it loads from
+    // are already allowed.
     remotePatterns: [
       { protocol: "https", hostname: "cdn.muapi.ai" },
       { protocol: "https", hostname: "images.unsplash.com" },
@@ -15,9 +11,8 @@ const nextConfig = {
     ],
   },
 
-  // Make sure server actions & route handlers can read env vars set in Cloudflare.
-  // OpenNext injects `process.env` from the bindings at runtime, but we also tell
-  // Next not to inline anything that would break the build on Workers.
+  // Keep prisma, the pg driver and the Stripe SDK out of the bundler so they
+  // are loaded from node_modules at runtime rather than bundled.
   serverExternalPackages: ["@prisma/client", "@prisma/adapter-pg", "pg", "stripe"],
 };
 

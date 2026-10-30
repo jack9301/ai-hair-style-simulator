@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { isValidWebhookToken } from "../../../../lib/security";
 
-// MuAPI webhook writes through Prisma + pg, both of which need Node APIs on Cloudflare.
+// MuAPI webhook writes through Prisma + pg, both of which need Node APIs.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
