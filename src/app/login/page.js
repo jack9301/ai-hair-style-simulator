@@ -62,10 +62,8 @@ function LoginContent() {
   const next = searchParams.get("callbackUrl") || searchParams.get("next") || "/";
   // `reason` is a category this app worked out for itself; `error` is one of
   // next-auth's own codes. Either can be present after a failed sign-in.
-  const failureMessage = explainFailure(
-    searchParams.get("reason"),
-    searchParams.get("error")
-  );
+  const reason = searchParams.get("reason");
+  const failureMessage = explainFailure(reason, searchParams.get("error"));
 
   const [activeTab, setActiveTab] = useState("google"); // "google" | "email" | "apikey"
   const [apiKeyInput, setApiKeyInput] = useState("");
@@ -188,8 +186,18 @@ function LoginContent() {
       <Toaster position="top-right" />
       <div className="relative bg-bg-card border border-divider w-full max-w-md rounded-xl p-8 space-y-6 shadow-2xl animate-scale-up">
         {failureMessage && (
-          <div className="flex items-start gap-2.5 bg-red-500/10 border border-red-500/30 text-red-300 p-3.5 rounded text-[11px] leading-relaxed">
-            <FaExclamationTriangle className="text-xs shrink-0 mt-0.5" />
+          <div
+            className={`flex items-start gap-2.5 border p-3.5 rounded text-[11px] leading-relaxed ${
+              reason === "database_healthy"
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                : "bg-red-500/10 border-red-500/30 text-red-300"
+            }`}
+          >
+            {reason === "database_healthy" ? (
+              <FaInfoCircle className="text-xs shrink-0 mt-0.5" />
+            ) : (
+              <FaExclamationTriangle className="text-xs shrink-0 mt-0.5" />
+            )}
             <span>{failureMessage}</span>
           </div>
         )}

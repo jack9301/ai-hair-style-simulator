@@ -57,6 +57,12 @@ export const FAILURES = {
     signIn:
       "This email address already has an account. Sign in with email and password instead.",
   },
+  database_healthy: {
+    status: 200,
+    registration:
+      "The database is reachable and its schema is up to date.",
+    signIn: "The database is reachable and its schema is up to date.",
+  },
   invalid_credentials: {
     status: 401,
     registration:

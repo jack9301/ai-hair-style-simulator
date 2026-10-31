@@ -22,6 +22,8 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req) {
   const raw = req.nextUrl.searchParams.get("error") || "";
+  // Visiting without an error code is a diagnostic rather than a failure.
+  const isDiagnostic = !raw;
 
   let category = raw ? classifyError(raw) : "";
 
@@ -38,7 +40,10 @@ export async function GET(req) {
       category = "schema_out_of_date";
     } else if (schema.reason === "unreachable") {
       category = "database_unreachable";
-    } else if (!category) {
+    } else if (isDiagnostic) {
+      // Nothing is wrong with the database, so saying so is the useful answer.
+      category = "database_healthy";
+    } else {
       category = "internal";
     }
   }

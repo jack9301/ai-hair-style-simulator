@@ -15,12 +15,22 @@ function checkDatabase() {
   probeSchema();
 }
 
-export async function GET(req) {
+/**
+ * The route context has to be passed on to next-auth.
+ *
+ * next-auth decides between its App Router and its Pages Router
+ * implementation by looking at the second argument: if it carries `params`,
+ * the App Router path is used, and only that path knows how to read the
+ * route's dynamic segment. Calling the handler without it sends next-auth
+ * down the Pages Router path, where `req.query` does not exist and every
+ * request fails with a TypeError.
+ */
+export async function GET(req, ctx) {
   checkDatabase();
-  return handler(req);
+  return handler(req, ctx);
 }
 
-export async function POST(req) {
+export async function POST(req, ctx) {
   checkDatabase();
-  return handler(req);
+  return handler(req, ctx);
 }
