@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, probeSchema } from "@/lib/prisma";
+import { classifyError, failureFor } from "@/lib/auth-errors";
 import { hashPassword, normalizeEmail, validatePassword } from "@/lib/password";
 
 // Prisma + pg need Node APIs; pin the route to the Node runtime.
@@ -9,74 +10,20 @@ export const dynamic = "force-dynamic";
 /** Free credits a brand new account starts with. */
 const INITIAL_CREDITS = 10;
 
-/**
- * Work out what actually went wrong.
- *
- * A registration can fail for several quite different reasons — the database
- * is unreachable, the schema on the server is older than the schema in this
- * repo, the generated Prisma client is stale — and they need completely
- * different fixes. Reporting them all as one generic "Failed to create the
- * account" makes the problem impossible to diagnose from the browser, so each
- * one gets its own message.
- */
-function classifyError(error) {
-  const code = typeof error?.code === "string" ? error.code : "";
-  const message = String(error?.message || "");
-
-  if (code === "P2002") return "duplicate";
-  if (
-    code === "P1001" ||
-    /can't reach database server|econnrefused|econnreset|enotfound|etimedout|eai_again|timeout|terminating connection/i.test(
-      message
-    )
-  ) {
-    return "database_unreachable";
-  }
-  // P2022 = "the column does not exist in the database" — the server is still
-  // on the schema from before `User.password` was added.
-  if (code === "P2022" || /column .* does not exist/i.test(message)) {
-    return "schema_out_of_date";
-  }
-  // "Unknown argument `password`" — the generated Prisma client on the server
-  // predates the field, which happens when the build did not regenerate it.
-  if (/unknown argument|unknown field|invalid `prisma\.user\.create`/i.test(message)) {
-    return "client_out_of_date";
-  }
-  if (/subtle|webcrypto|pbkdf2|randomvalues/i.test(message)) {
-    return "hashing_failed";
-  }
-  return "internal";
-}
-
-const FAILURES = {
-  database_unreachable: {
-    status: 503,
-    error:
-      "Registration is unavailable right now: the database could not be reached.",
-  },
-  schema_out_of_date: {
-    status: 500,
-    error:
-      "Registration is unavailable: the server's database schema is out of date and needs updating.",
-  },
-  client_out_of_date: {
-    status: 500,
-    error:
-      "Registration is unavailable: the app needs to be rebuilt and redeployed.",
-  },
-  hashing_failed: {
-    status: 500,
-    error:
-      "Registration is unavailable: this runtime could not hash the password.",
-  },
-  internal: {
-    status: 500,
-    error: "Failed to create the account",
-  },
-};
-
 export async function POST(req) {
   try {
+    // A deployment with no DATABASE_URL cannot do anything at all, and the
+    // failure it would otherwise produce is indistinguishable from a database
+    // that is merely unreachable.
+    if (!process.env.DATABASE_URL) {
+      const failure = failureFor("database_not_configured");
+      console.error("[REGISTER] database_not_configured: DATABASE_URL is not set");
+      return NextResponse.json(
+        { error: failure.registration, code: "database_not_configured" },
+        { status: failure.status }
+      );
+    }
+
     const body = await req.json().catch(() => null);
 
     const email = normalizeEmail(body?.email);
@@ -103,12 +50,10 @@ export async function POST(req) {
       // The response does not confirm that the address is registered. Saying
       // so would turn this endpoint into a way to discover which addresses
       // have accounts; the wording points at signing in instead.
+      const failure = failureFor("account_exists");
       return NextResponse.json(
-        {
-          error:
-            "Unable to create the account. If you already have one, try signing in.",
-        },
-        { status: 409 }
+        { error: failure.registration, code: "account_exists" },
+        { status: failure.status }
       );
     }
 
@@ -128,12 +73,10 @@ export async function POST(req) {
       // P2002 = unique constraint. Two requests for the same address can race
       // past the lookup above; the database is the real arbiter.
       if (err?.code === "P2002") {
+        const failure = failureFor("account_exists");
         return NextResponse.json(
-          {
-            error:
-              "Unable to create the account. If you already have one, try signing in.",
-          },
-          { status: 409 }
+          { error: failure.registration, code: "account_exists" },
+          { status: failure.status }
         );
       }
       throw err;
@@ -141,13 +84,27 @@ export async function POST(req) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    const kind = classifyError(error);
-    const failure = FAILURES[kind] || FAILURES.internal;
+    let kind = classifyError(error);
+
+    if (kind === "internal") {
+      // The raw error was not recognisable. Ask the database directly rather
+      // than guess: whether it can be reached at all is the single most
+      // useful thing to know, and it is what separates "fix the connection
+      // string" from "push the schema".
+      const schema = await probeSchema();
+      if (schema.reason === "missing_user_table" || schema.reason === "missing_columns") {
+        kind = "schema_out_of_date";
+      } else if (schema.reason === "unreachable") {
+        kind = "database_unreachable";
+      }
+    }
+
+    const failure = failureFor(kind);
     // The full error goes to the server log; the client gets the category and
     // a message that says which fix is needed.
     console.error(`[REGISTER] ${kind}`, error);
     return NextResponse.json(
-      { error: failure.error, code: kind },
+      { error: failure.registration, code: kind },
       { status: failure.status }
     );
   }

@@ -3,14 +3,69 @@
 import { signIn, useSession } from "next-auth/react";
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FaGoogle, FaKey, FaInfoCircle, FaArrowRight, FaEnvelope } from "react-icons/fa";
+import { FaGoogle, FaKey, FaInfoCircle, FaArrowRight, FaEnvelope, FaExclamationTriangle } from "react-icons/fa";
 import toast, { Toaster } from "react-hot-toast";
+import { FAILURES } from "@/lib/auth-errors";
+
+/**
+ * What next-auth's own error codes mean.
+ *
+ * next-auth collapses every uncaught failure in the OAuth callback into one
+ * code called "Callback", so the browser is never told what actually went
+ * wrong. The detail is in the server log; this is what can honestly be said
+ * in the page itself.
+ */
+const AUTH_ERROR_MESSAGES = {
+  Callback:
+    "Sign-in failed while talking to the server. The reason is in the deployment's logs.",
+  OAuthCallback:
+    "Google sign-in could not be completed. Please try again.",
+  OAuthSignin:
+    "Could not start the Google sign-in. Please try again.",
+  CredentialsSignin:
+    "That email address and password combination was not accepted.",
+  OAuthAccountNotLinked:
+    "This email address is already registered with a different sign-in method. Use email and password instead.",
+  OAuthCreateAccount:
+    "An account already exists for this email address. Sign in with email and password instead.",
+  EmailCreateAccount:
+    "An account already exists for this email address. Sign in with email and password instead.",
+  AccessDenied: "Access was denied. Please try a different sign-in method.",
+  Configuration:
+    "Sign-in is not configured correctly on this deployment. Please contact the site owner.",
+  Verification: "That sign-in link could not be verified. Please try again.",
+  SessionRequired: "Please sign in to continue.",
+  Signin: "Sign-in did not complete. Please try again.",
+};
+
+/**
+ * Work out what to tell the visitor, if anything went wrong.
+ *
+ * `reason` is a category this app worked out for itself (the database is
+ * unreachable, the schema is out of date, …); `error` is one of next-auth's
+ * own codes.
+ */
+function explainFailure(reason, error) {
+  if (reason) {
+    return FAILURES[reason]?.signIn || "Sign-in failed. Please try again.";
+  }
+  if (error) {
+    return AUTH_ERROR_MESSAGES[error] || "Sign-in failed. Please try again.";
+  }
+  return null;
+}
 
 function LoginContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("callbackUrl") || searchParams.get("next") || "/";
+  // `reason` is a category this app worked out for itself; `error` is one of
+  // next-auth's own codes. Either can be present after a failed sign-in.
+  const failureMessage = explainFailure(
+    searchParams.get("reason"),
+    searchParams.get("error")
+  );
 
   const [activeTab, setActiveTab] = useState("google"); // "google" | "email" | "apikey"
   const [apiKeyInput, setApiKeyInput] = useState("");
@@ -24,6 +79,12 @@ function LoginContent() {
       router.push(next);
     }
   }, [status, router, next]);
+
+  useEffect(() => {
+    if (failureMessage) {
+      toast.error(failureMessage);
+    }
+  }, [failureMessage]);
 
   const handleApiKeyLogin = async (e) => {
     e.preventDefault();
@@ -126,6 +187,13 @@ function LoginContent() {
     <div className="min-h-dvh flex items-center justify-center bg-bg-page px-6 text-primary-text select-none">
       <Toaster position="top-right" />
       <div className="relative bg-bg-card border border-divider w-full max-w-md rounded-xl p-8 space-y-6 shadow-2xl animate-scale-up">
+        {failureMessage && (
+          <div className="flex items-start gap-2.5 bg-red-500/10 border border-red-500/30 text-red-300 p-3.5 rounded text-[11px] leading-relaxed">
+            <FaExclamationTriangle className="text-xs shrink-0 mt-0.5" />
+            <span>{failureMessage}</span>
+          </div>
+        )}
+
         <div className="flex flex-col items-center text-center space-y-3">
           <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-2xl text-primary font-black shadow-md shadow-primary/15">
             ✂️

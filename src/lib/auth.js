@@ -7,6 +7,35 @@ import { assertSecureServerConfig } from "./secrets";
 import { hashPassword, needsRehash, normalizeEmail, verifyPassword } from "./password";
 
 /**
+ * Wrap an adapter so that a database failure during sign-in is logged with
+ * its reason attached.
+ *
+ * next-auth catches everything that goes wrong in the OAuth callback and turns
+ * it into a redirect back to the sign-in page. The browser therefore sees
+ * nothing but a dead end, and without this the reason never reaches the log
+ * either — the only symptom is that the visitor ends up where they started.
+ */
+function withLogging(adapter) {
+  return Object.fromEntries(
+    Object.entries(adapter).map(([name, fn]) => [
+      name,
+      typeof fn === "function"
+        ? async (...args) => {
+            try {
+              return await fn(...args);
+            } catch (err) {
+              console.error(`[auth] database call "${name}" failed:`, err);
+              throw err;
+            }
+          }
+        : fn,
+    ])
+  );
+}
+
+const adapter = withLogging(PrismaAdapter(prisma));
+
+/**
  * A hash of a value nobody knows, used to spend the same amount of time when
  * an email address has no account. Without it, the response time would reveal
  * which addresses are registered.
@@ -23,7 +52,7 @@ function getDummyHash() {
 }
 
 export const authOptions = {
-  adapter: PrismaAdapter(prisma),
+  adapter,
   session: {
     strategy: "jwt",
   },
@@ -219,5 +248,10 @@ export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
     signIn: "/login",
+    // next-auth's own error page says only "there was a problem", which is no
+    // help when the problem is a deployment aimed at the wrong database. This
+    // route classifies the failure and hands the login page a category it can
+    // explain in words.
+    error: "/auth/failure",
   },
 };

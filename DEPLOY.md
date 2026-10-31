@@ -153,3 +153,103 @@ To deploy a change without touching `main`, push a branch and open a pull reques
 ### Environment variables locally
 
 Keep your local `.env` in sync with the Vercel dashboard. `.env` is gitignored, so it never leaves your machine. `NEXTAUTH_URL` and `WEBHOOK_URL` should point at `http://localhost:3000` locally.
+
+---
+
+## 9. Changing an environment variable later
+
+Go to **Project → Settings → Environment Variables**.
+
+**You can edit a variable's value in place — there is no need to delete it and add a new one.** Vercel encrypts the value when you save it and deliberately does not show it again, so the field looks empty when you open it. That is expected, not a sign the variable was lost.
+
+Two things to remember:
+
+1. **Saving does not redeploy.** The live deployment keeps the value it was built with. Vercel shows a banner offering to redeploy — take it, or push a new commit.
+2. **Check the scope.** A variable can be set for Production, Preview and Development independently. If only Production is wrong, fixing it there leaves preview deployments broken.
+
+### Seeing the values that are actually set
+
+Since the dashboard will not show them, pull them down with the CLI:
+
+```bash
+npx vercel login
+npx vercel env pull .env.local --environment=production
+```
+
+That writes the production values to `.env.local`, which is gitignored. Read it locally to compare the `DATABASE_URL` with the one in your `.env` — the host and port tell you which Supabase project each one points at. Delete `.env.local` when you are done.
+
+### If you change DATABASE_URL to a different database
+
+A different database is an **empty** database. Push the schema to it before redeploying, or every query fails:
+
+```bash
+npx prisma db push
+```
+
+Run that with the new URL in `.env`, or set it as `PRISMA_CLI_DATABASE_URL` to push without touching your working `.env`. The app is unaffected by `PRISMA_CLI_DATABASE_URL` — it only tells the Prisma CLI where to connect.
+
+> ⚠️ Pointing the deployment at a different database makes the old one invisible to the app: existing accounts, hairstyles and credit balances stay in the old database but the app no longer reads it. Prefer fixing the schema on the database you already have (`npx prisma db push`) over moving to a new one, unless that database is genuinely wrong.
+
+---
+
+## 10. When sign-in fails in production
+
+The most common cause is that the deployment and the schema are pointing at two
+different databases. It is easy to create by accident: `prisma db push` uses
+the URL in your local `.env`, while the deployment uses the URL in the Vercel
+dashboard. If those are not the same database, everything works locally and
+nothing works in production.
+
+The symptom is sign-in that fails without saying why — the browser returns to
+the sign-in page and no user row appears in Supabase.
+
+### Finding out what is wrong
+
+Open **`https://YOUR-DOMAIN/auth/failure`**. It checks the database the
+deployment is actually using and redirects to the sign-in page with the
+reason, in words:
+
+| What it says | What it means |
+|---|---|
+| the database could not be reached | `DATABASE_URL` points at a host the deployment cannot connect to — usually Supabase's direct (IPv6-only) host instead of the transaction pooler |
+| the database schema is out of date | the deployment is talking to a real database, but one that `prisma db push` was never run against |
+| this deployment has no database configured | `DATABASE_URL` is not set for the environment the deployment runs in |
+
+The server log has the detail. **Vercel → the project → Logs → Runtime Logs**
+shows two lines from the app itself:
+
+```
+[prisma] database target: <host>:<port> project=<ref> fingerprint=<hash>
+[prisma] schema check: ok
+```
+
+The first says which database the deployment is aimed at — the host, the port
+and the Supabase project reference. The second says whether that database has
+the tables the app needs. If the schema check reports that the `User` table is
+missing `password`, the deployment is pointed at a database that predates the
+email sign-up feature.
+
+### The fix
+
+1. In **Vercel → Settings → Environment Variables**, set `DATABASE_URL` to the
+   transaction pooler URL (port `6543`) of the same Supabase project your local
+   `.env` uses. Compare the host and port with the `database target` line in
+   the log.
+2. Push the schema to that database:
+   ```bash
+   npx prisma db push
+   ```
+3. Redeploy — saving the variable is not enough on its own (§9).
+
+### Why the transaction pooler and not the direct connection
+
+Supabase's direct host (`db.<ref>.supabase.co`) is IPv6-only. Serverless
+functions reach it only sometimes, so the connection fails unpredictably. The
+transaction pooler on port `6543` is the one that works from a serverless
+platform, and it is the same URL you already use locally.
+
+> The Supabase Vercel integration also adds `POSTGRES_URL` and
+> `PRISMA_DATABASE_URL` to the project. The app only ever reads `DATABASE_URL`,
+> so those two are harmless — but if one of them points at a different project
+> than `DATABASE_URL`, that is worth tidying up before it confuses the next
+> person.
