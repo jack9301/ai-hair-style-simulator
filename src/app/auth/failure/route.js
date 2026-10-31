@@ -56,6 +56,10 @@ export async function GET(req) {
   // The category is also sent as a code so the login page can style the
   // message without having to know the wording.
   url.searchParams.set("code", category);
+  // Keep the page the visitor was heading for, so that signing in again
+  // takes them back where they meant to go.
+  const callbackUrl = req.nextUrl.searchParams.get("callbackUrl");
+  if (callbackUrl) url.searchParams.set("callbackUrl", callbackUrl);
 
   return NextResponse.redirect(url, {
     headers: { "Cache-Control": "no-store" },

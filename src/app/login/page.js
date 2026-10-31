@@ -46,11 +46,22 @@ const AUTH_ERROR_MESSAGES = {
  * own codes.
  */
 function explainFailure(reason, error) {
-  if (reason) {
+  // A category this app worked out for itself beats next-auth's own code,
+  // because it names the cause rather than the symptom. But when the
+  // category is the catch-all "internal", next-auth's code is the more
+  // useful of the two: it at least says which step failed.
+  if (reason && reason !== "internal") {
     return FAILURES[reason]?.signIn || "Sign-in failed. Please try again.";
   }
   if (error) {
-    return AUTH_ERROR_MESSAGES[error] || "Sign-in failed. Please try again.";
+    return (
+      AUTH_ERROR_MESSAGES[error] ||
+      FAILURES[reason]?.signIn ||
+      "Sign-in failed. Please try again."
+    );
+  }
+  if (reason) {
+    return FAILURES[reason]?.signIn || "Sign-in failed. Please try again.";
   }
   return null;
 }

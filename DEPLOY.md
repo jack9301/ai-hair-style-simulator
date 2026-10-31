@@ -205,8 +205,13 @@ the sign-in page and no user row appears in Supabase.
 
 ### Finding out what is wrong
 
-Open **`https://YOUR-DOMAIN/auth/failure`**. It checks the database the
-deployment is actually using and redirects to the sign-in page with the
+A failed sign-in now reports its own cause. next-auth collapses every
+uncaught failure in the OAuth callback into a single code called `Callback`,
+and it redirects to its own sign-in page for that code — ignoring the
+`pages.error` page entirely, so the failure would never have reached the part
+of the app that can explain it. The route handler catches that redirect and
+sends it through **`/auth/failure`** instead, which checks the database the
+deployment is actually using and then redirects to the sign-in page with the
 reason, in words:
 
 | What it says | What it means |
@@ -214,6 +219,11 @@ reason, in words:
 | the database could not be reached | `DATABASE_URL` points at a host the deployment cannot connect to — usually Supabase's direct (IPv6-only) host instead of the transaction pooler |
 | the database schema is out of date | the deployment is talking to a real database, but one that `prisma db push` was never run against |
 | this deployment has no database configured | `DATABASE_URL` is not set for the environment the deployment runs in |
+| the database is reachable and its schema is up to date | the database is fine, and the failure was something else — read the runtime log |
+
+You can also open **`https://YOUR-DOMAIN/auth/failure`** yourself at any time.
+Without an error code it works as a health check and reports the state of the
+database, whichever way it comes out.
 
 The server log has the detail. **Vercel → the project → Logs → Runtime Logs**
 shows two lines from the app itself:

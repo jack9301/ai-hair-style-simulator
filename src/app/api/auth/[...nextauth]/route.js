@@ -27,10 +27,59 @@ function checkDatabase() {
  */
 export async function GET(req, ctx) {
   checkDatabase();
-  return handler(req, ctx);
+  const response = await handler(req, ctx);
+  return routeFailureToDiagnostic(response, req);
 }
 
 export async function POST(req, ctx) {
   checkDatabase();
-  return handler(req, ctx);
+  const response = await handler(req, ctx);
+  return routeFailureToDiagnostic(response, req);
+}
+
+/**
+ * Send a failed sign-in through the diagnostic page.
+ *
+ * next-auth collapses every uncaught failure in the OAuth callback into one
+ * code, "Callback", and redirects to its own sign-in page. For that list of
+ * codes it skips `pages.error` altogether, so the failure never reaches the
+ * page that knows how to explain it — the browser just lands back on the
+ * sign-in form with no reason given.
+ *
+ * The redirect is caught here, where it is still visible, and pointed at
+ * /auth/failure instead. That page works out what actually went wrong and
+ * hands the sign-in page a category it can put into words.
+ */
+function routeFailureToDiagnostic(response, req) {
+  const location = response.headers.get("Location");
+  if (!location) return response;
+
+  let target;
+  try {
+    target = new URL(location, req.nextUrl.origin);
+  } catch {
+    return response;
+  }
+
+  const error = target.searchParams.get("error");
+  if (!error) return response;
+
+  // Only failures that point back at this app's own pages are worth
+  // re-routing. Anything else — a provider's authorisation URL, say — is
+  // left exactly as it was.
+  const pointsAtApp =
+    target.pathname.startsWith("/api/auth/") ||
+    target.pathname === "/login" ||
+    target.pathname === "/auth/failure";
+  if (!pointsAtApp) return response;
+
+  const failure = new URL("/auth/failure", req.nextUrl.origin);
+  failure.searchParams.set("error", error);
+  // Keep the page the visitor was heading for, so signing in again takes
+  // them back where they meant to go.
+  const callbackUrl = target.searchParams.get("callbackUrl");
+  if (callbackUrl) failure.searchParams.set("callbackUrl", callbackUrl);
+
+  response.headers.set("Location", failure.toString());
+  return response;
 }

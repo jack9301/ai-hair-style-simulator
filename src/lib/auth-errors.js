@@ -69,6 +69,32 @@ export const FAILURES = {
       "Unable to create the account. If you already have one, try signing in.",
     signIn: "That email address and password combination was not accepted.",
   },
+  access_denied: {
+    status: 403,
+    registration: "Access was denied.",
+    signIn: "Access was denied, so the sign-in did not complete.",
+  },
+  oauth_signin_failed: {
+    status: 500,
+    registration: "Could not start the sign-in.",
+    signIn: "Could not start the sign-in with that provider. Please try again.",
+  },
+  configuration: {
+    status: 500,
+    registration: "Sign-in is not configured correctly on this deployment.",
+    signIn:
+      "Sign-in is not configured correctly on this deployment. Please contact the site owner.",
+  },
+  verification: {
+    status: 400,
+    registration: "That sign-in link could not be verified.",
+    signIn: "That sign-in link could not be verified. Please try again.",
+  },
+  session_required: {
+    status: 401,
+    registration: "Please sign in to continue.",
+    signIn: "Please sign in to continue.",
+  },
   internal: {
     status: 500,
     registration: "Failed to create the account.",
@@ -126,8 +152,10 @@ export function classifyError(error) {
   }
 
   // next-auth's own error codes, plus the message the email provider throws.
+  // The codes arrive spelled both ways: "CredentialsSignin" in the URL and
+  // "CredentialsSignin" as the name of the error class.
   if (
-    /credentials_signin|invalid email or password|invalid credentials/i.test(
+    /credentials_?signin|email_?signin|invalid email or password|invalid credentials/i.test(
       message
     )
   ) {
@@ -136,10 +164,22 @@ export function classifyError(error) {
   if (/oauthaccountnotlinked|oauthcreateaccount|emailcreateaccount/i.test(message)) {
     return "account_exists";
   }
-  if (/oauthcallback|oauthsignin|^callback$/i.test(message)) {
+
+  // The rest of next-auth's codes each name one specific thing that went
+  // wrong. Recognising them means the visitor is told what actually
+  // happened, instead of everything being lumped together as "internal".
+  if (/^accessdenied$/i.test(message)) return "access_denied";
+  if (/^oauthsignin$/i.test(message)) return "oauth_signin_failed";
+  if (/^configuration$/i.test(message)) return "configuration";
+  if (/^verification$/i.test(message)) return "verification";
+  if (/^sessionrequired$/i.test(message) || /^signin$/i.test(message)) {
+    return "session_required";
+  }
+
+  if (/oauthcallback|^callback$/i.test(message)) {
     // next-auth collapses every uncaught failure in the OAuth callback into
     // this one code, so it says nothing on its own — the real reason is in
-    // the server log.
+    // the server log, and the database is the first place to look.
     return "internal";
   }
 
