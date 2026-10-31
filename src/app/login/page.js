@@ -81,9 +81,21 @@ function LoginContent() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
-        const data = await res.json().catch(() => ({}));
+        // A response that is not JSON means the request never reached the
+        // register route at all — most often the deployment is older than the
+        // code that adds it.
+        const data = await res.json().catch(() => null);
         if (!res.ok) {
-          toast.error(data?.error || "Failed to create the account");
+          if (res.status === 404) {
+            toast.error(
+              "This deployment does not include the register route. Push the latest commit and redeploy."
+            );
+            return;
+          }
+          toast.error(
+            data?.error ||
+              `Failed to create the account (HTTP ${res.status}).`
+          );
           return;
         }
         toast.success("Account created! Signing you in...");

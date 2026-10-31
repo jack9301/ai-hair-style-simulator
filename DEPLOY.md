@@ -48,6 +48,12 @@ npx prisma db push
 
 This only needs the `DATABASE_URL` in `.env`. It points at the **Session pooler** automatically — the Prisma schema engine hangs against the transaction pooler.
 
+> ⚠️ **Push the schema to the same database the deployment uses.** If the `DATABASE_URL` in your local `.env` and the one set on the Vercel project are different databases, everything will work locally and fail in production — the app will report that the `User.password` column does not exist, or that it cannot reach the database at all.
+>
+> To push to a different database than the one in `.env`, put its URL in `.env` as `PRISMA_CLI_DATABASE_URL` and run `npx prisma db push` again. That variable takes priority over `DATABASE_URL` for the CLI only; the running app is unaffected.
+
+Re-run `npx prisma db push` after every change to `prisma/schema.prisma` — including adding a column.
+
 ---
 
 ## 3. Configure Google OAuth
