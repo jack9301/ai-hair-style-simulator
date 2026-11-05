@@ -424,7 +424,7 @@ function LoginContent() {
               </div>
               <div className="flex justify-end">
                 <a
-                  href="https://platform.minimax.io"
+                  href="https://platform.minimax.cn"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[10px] text-primary hover:underline font-semibold"

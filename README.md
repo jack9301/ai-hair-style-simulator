@@ -20,7 +20,7 @@ https://github.com/user-attachments/assets/6dfe24cf-ffff-4096-872a-d9c8fe0faf44
 
 ## Related Projects
 
-- [MiniMax platform](https://platform.minimax.io) — Where the image model used for virtual hairstyle previews lives.
+- [MiniMax platform](https://platform.minimax.cn) — Where the image model used for virtual hairstyle previews lives.
 - [MiniMax API docs](https://platform.minimax.io/docs/api-reference/image-generation-t2i) — The image generation endpoint this app calls.
 
 ## 🌐 Project Details
@@ -95,7 +95,7 @@ To successfully deploy and run, you must populate the following environment vari
 | **Stripe Billing** | `STRIPE_SECRET_KEY` | Get from Stripe Dashboard |
 | | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Get from Stripe Dashboard |
 | | `STRIPE_WEBHOOK_SECRET` | Webhook secret for resolving credit purchases |
-| **AI Generation** | `MINIMAX_API_KEY` | Create an account and get key from [platform.minimax.io](https://platform.minimax.io) |
+| **AI Generation** | `MINIMAX_API_KEY` | Create an account and get key from [platform.minimax.cn](https://platform.minimax.cn) |
 
 ### 🚀 Launching on Vercel: Step-by-Step
 

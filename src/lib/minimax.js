@@ -7,8 +7,18 @@
 // image. There is no job queue to poll and no callback to wait for, so the
 // whole submit/poll/webhook dance the previous provider needed is gone.
 
-/** Where MiniMax's API lives. Override with MINIMAX_API_BASE_URL if needed. */
-const DEFAULT_BASE_URL = "https://api.minimax.io";
+/**
+ * Where MiniMax's API lives.
+ *
+ * MiniMax runs two isolated platforms and the keys do not cross between them:
+ * a key from platform.minimax.cn only works against api.minimax.cn, and a key
+ * from platform.minimax.io only works against api.minimax.io. Sending a key
+ * to the wrong host gets `base_resp.status_code: 2049, "invalid api key"`.
+ *
+ * The default is the China platform. Override it with MINIMAX_API_BASE_URL
+ * if your key comes from the international one.
+ */
+const DEFAULT_BASE_URL = "https://api.minimax.cn";
 
 /** The image model. `image-01` is the one that accepts a reference image. */
 const DEFAULT_MODEL = "image-01";
@@ -44,6 +54,13 @@ const ERROR_CODE_MESSAGES = {
   // Same thing, reported by a different MiniMax gateway.
   2013: {
     message: "MiniMax rejected the API key. Check that the key is correct.",
+    code: "invalid_key",
+  },
+  // "invalid api key" — in practice this is almost always the key being sent
+  // to the other platform, because the two do not share keys.
+  2049: {
+    message:
+      "MiniMax rejected the API key. A key from platform.minimax.cn only works against api.minimax.cn — check MINIMAX_API_BASE_URL.",
     code: "invalid_key",
   },
   // The account is out of credit.

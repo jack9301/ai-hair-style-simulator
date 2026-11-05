@@ -14,7 +14,7 @@ This guide takes you from a fresh fork to a live site on **Vercel**, with **Supa
 - A **Supabase account** (free tier): https://supabase.com — for the Postgres database
 - A **Google Cloud Console** project with OAuth credentials (for sign-in)
 - A **Stripe** account in test mode
-- A **MiniMax account**: https://platform.minimax.io — for the AI image generation API
+- A **MiniMax account**: https://platform.minimax.cn — for the AI image generation API
 
 ---
 
@@ -104,11 +104,14 @@ Re-run `npx prisma db push` after every change to `prisma/schema.prisma` — inc
    | `STRIPE_SECRET_KEY` | Stripe dashboard (§4) |
    | `STRIPE_WEBHOOK_SECRET` | Stripe webhook endpoint (§4) |
    | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe dashboard (§4) |
-   | `MINIMAX_API_KEY` | https://platform.minimax.io |
+   | `MINIMAX_API_KEY` | https://platform.minimax.cn |
+   | `MINIMAX_API_BASE_URL` | Optional — `https://api.minimax.cn` by default, `https://api.minimax.io` for an international key |
 
    > ⚠️ `NEXTAUTH_SECRET` must be a real random value. A placeholder makes every session cookie forgeable, and the app **refuses to serve traffic** until it is set — that check runs at startup via `src/instrumentation.js`.
    >
    > ⚠️ `MINIMAX_API_KEY` must be real too. While it is a placeholder, generations silently fall back to stock images (and are not charged, deliberately).
+   >
+   > ⚠️ MiniMax's two platforms do not share keys. A key from platform.minimax.cn only works against `api.minimax.cn`, and a key from platform.minimax.io only works against `api.minimax.io`. The wrong one gets `invalid api key` — set `MINIMAX_API_BASE_URL` to match where you signed up.
 
 4. Click **Deploy**. The first build takes a few minutes.
 
