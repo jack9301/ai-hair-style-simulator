@@ -18,14 +18,6 @@ export default function GalleryPage() {
   const [selectedCreation, setSelectedCreation] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
-  useEffect(() => {
-    if (session?.user) {
-      fetchCompletedCreations();
-    } else if (status !== "loading") {
-      setLoading(false);
-    }
-  }, [session, status]);
-
   const fetchCompletedCreations = async () => {
     setLoading(true);
     try {
@@ -43,6 +35,32 @@ export default function GalleryPage() {
     }
   };
 
+  useEffect(() => {
+    if (session?.user) {
+      fetchCompletedCreations();
+    } else if (status !== "loading") {
+      setLoading(false);
+    }
+  }, [session, status]);
+
+  const handleSelect = async (creation) => {
+    // Show the result straight away, then fill in the original selfie. The
+    // list endpoint leaves that out — it is a full-size image and only the
+    // one open result needs it.
+    setSelectedCreation(creation);
+    try {
+      const res = await fetch(`/api/creations?id=${creation.id}`);
+      if (res.ok) {
+        const full = await res.json();
+        setSelectedCreation((current) =>
+          current && current.id === full.id ? full : current
+        );
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleDownload = async (creation) => {
     if (!creation.resultImage) return;
     try {
@@ -51,7 +69,7 @@ export default function GalleryPage() {
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
-      a.download = `hairstyle-${creation.id}.png`;
+      a.download = `hairstyle-${creation.id}.jpg`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -156,7 +174,7 @@ export default function GalleryPage() {
             {creations.map((creation) => (
               <div
                 key={creation.id}
-                onClick={() => setSelectedCreation(creation)}
+                onClick={() => handleSelect(creation)}
                 className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-lg hover:shadow-xl hover:border-zinc-700 transition-all flex flex-col h-full group cursor-pointer"
               >
                 

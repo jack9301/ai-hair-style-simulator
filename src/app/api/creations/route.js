@@ -43,9 +43,29 @@ export async function GET(req) {
     }
 
     // 1. Fetch user's creations
+    //
+    // `inputImage` is left out on purpose. It is the original photo, stored
+    // inline as base64, and the gallery only needs it for the one result the
+    // user opens — the detail view fetches it on demand from the single-row
+    // endpoint. Carrying it in every row of the list doubled the size of the
+    // response for nothing.
     const creations = await prisma.hairStyle.findMany({
       where: { userId: session.user.id },
-      orderBy: { createTime: "desc" }
+      orderBy: { createTime: "desc" },
+      select: {
+        id: true,
+        userId: true,
+        resultImage: true,
+        gender: true,
+        styleName: true,
+        colorName: true,
+        prompt: true,
+        requestId: true,
+        status: true,
+        creditCost: true,
+        createTime: true,
+        updateTime: true,
+      },
     });
 
     // 2. Retire the ones that never finished.
