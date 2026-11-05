@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
+import { UserService } from "../../../../lib/services/user";
 
 /**
  * How long a creation may stay "processing" before we call it failed.
@@ -30,14 +31,21 @@ export async function GET(req, { params }) {
       return new NextResponse("Not Found", { status: 404 });
     }
 
-    if (creation.status === "processing") {
-      const started = creation.createTime ? new Date(creation.createTime).getTime() : 0;
-      if (Date.now() - started > PROCESSING_TIMEOUT_MS) {
-        creation = await prisma.hairStyle.update({
-          where: { id: creation.id },
-          data: { status: "failed" }
-        });
+    if (creation.status === "processing" && isStale(creation)) {
+      // Retire it and give the credits back — see the list endpoint for why.
+      const { count } = await prisma.hairStyle.updateMany({
+        where: { id: creation.id, status: "processing" },
+        data: { status: "failed", creditCost: 0 },
+      });
+      if (count === 1) {
+        const cost = creation.creditCost || 0;
+        if (cost > 0) {
+          await UserService.addCredits(creation.userId, cost);
+        }
       }
+      creation = await prisma.hairStyle.findFirst({
+        where: { id, userId: session.user.id }
+      });
     }
 
     return NextResponse.json(creation);
@@ -45,6 +53,13 @@ export async function GET(req, { params }) {
     console.error("[CREATION_ID_GET]", error);
     return new NextResponse("Internal Error", { status: 500 });
   }
+}
+
+/** True when a creation has been "processing" for too long to still be real. */
+function isStale(creation) {
+  if (creation.status !== "processing") return false;
+  const started = creation.createTime ? new Date(creation.createTime).getTime() : 0;
+  return Date.now() - started > PROCESSING_TIMEOUT_MS;
 }
 
 export async function DELETE(req, { params }) {

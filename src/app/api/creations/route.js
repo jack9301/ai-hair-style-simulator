@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
+import { UserService } from "../../../lib/services/user";
 
 /**
  * How long a creation may stay "processing" before we call it failed.
@@ -69,15 +70,25 @@ export async function GET(req) {
     });
 
     // 2. Retire the ones that never finished.
+    //
+    // A generation that never came back was paid for and never delivered —
+    // most likely the function was killed by the platform's timeout — so the
+    // credits go back. The update is conditional on the row still being
+    // "processing", so when two requests race, only the one that actually
+    // retired the row refunds it.
     const stale = creations.filter(isStale);
-    if (stale.length > 0) {
-      await prisma.hairStyle.updateMany({
-        where: { id: { in: stale.map((c) => c.id) } },
-        data: { status: "failed" }
+    for (const creation of stale) {
+      const { count } = await prisma.hairStyle.updateMany({
+        where: { id: creation.id, status: "processing" },
+        data: { status: "failed", creditCost: 0 },
       });
-      for (const creation of creations) {
-        if (stale.includes(creation)) creation.status = "failed";
+      if (count === 1) {
+        const cost = creation.creditCost || 0;
+        if (cost > 0) {
+          await UserService.addCredits(creation.userId, cost);
+        }
       }
+      creation.status = "failed";
     }
 
     return NextResponse.json(creations);

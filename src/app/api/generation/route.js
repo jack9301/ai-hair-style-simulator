@@ -11,6 +11,12 @@ import {
   MAX_PROMPT_LENGTH,
 } from "../../../lib/security";
 
+// The provider answers in a single request, so this function stays open for
+// the whole generation — around 20-30 seconds in practice, longer when
+// MiniMax is busy. 60 seconds is the ceiling on the Hobby plan; declaring it
+// stops the platform falling back to a much shorter default.
+export const maxDuration = 60;
+
 const FALLBACK_HAIRSTYLES = [
   "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=800", // blonde bob
   "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=800", // long waves

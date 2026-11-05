@@ -216,6 +216,14 @@ export default function StudioPage() {
         return;
       }
 
+      if (res.status === 504) {
+        setGeneratingError(
+          "The AI took too long to answer and the request timed out. Please try again."
+        );
+        setGeneratingStatus("error");
+        return;
+      }
+
       if (!res.ok) throw new Error("Generation request failed");
       const data = await res.json();
 
