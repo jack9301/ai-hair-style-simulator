@@ -34,9 +34,19 @@ export async function GET(req) {
       }
 
       if (isStale(creation)) {
-        creation = await prisma.hairStyle.update({
-          where: { id: creation.id },
-          data: { status: "failed" }
+        // Retire it and give the credits back — see the list branch below.
+        const { count } = await prisma.hairStyle.updateMany({
+          where: { id: creation.id, status: "processing" },
+          data: { status: "failed", creditCost: 0 },
+        });
+        if (count === 1) {
+          const cost = creation.creditCost || 0;
+          if (cost > 0) {
+            await UserService.addCredits(creation.userId, cost);
+          }
+        }
+        creation = await prisma.hairStyle.findFirst({
+          where: { id, userId: session.user.id }
         });
       }
 
