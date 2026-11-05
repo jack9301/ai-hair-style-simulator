@@ -99,7 +99,7 @@ function LoginContent() {
     e.preventDefault();
     const key = apiKeyInput.trim();
     if (!key) {
-      toast.error("Please enter a valid MuAPI key");
+      toast.error("Please enter a valid MiniMax API key");
       return;
     }
     if (key.length < 5) {
@@ -219,7 +219,7 @@ function LoginContent() {
           </div>
           <h2 className="text-2xl font-black uppercase tracking-tight">Sign In to Studio</h2>
           <p className="text-xs font-semibold text-secondary-text leading-relaxed px-2">
-            Choose your preferred sign-in method: Google Account, Email, or a custom MuAPI Key.
+            Choose your preferred sign-in method: Google Account, Email, or a custom MiniMax API Key.
           </p>
         </div>
 
@@ -411,25 +411,25 @@ function LoginContent() {
           <form onSubmit={handleApiKeyLogin} className="space-y-4 pt-2">
             <div className="space-y-1.5">
               <label className="block text-[11px] uppercase font-bold text-secondary-text tracking-wider">
-                MuAPI Key
+                MiniMax API Key
               </label>
               <div className="relative">
                 <input
                   type="password"
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder="Enter your mu_... key"
+                  placeholder="Enter your MiniMax API key"
                   className="w-full bg-bg-page border border-divider rounded-lg px-3.5 py-2.5 text-xs text-white placeholder-secondary-text/50 focus:outline-none focus:border-primary transition-colors"
                 />
               </div>
               <div className="flex justify-end">
                 <a
-                  href="https://muapi.ai"
+                  href="https://platform.minimax.io"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[10px] text-primary hover:underline font-semibold"
                 >
-                  Get API Key from MuAPI →
+                  Get API Key from MiniMax →
                 </a>
               </div>
             </div>

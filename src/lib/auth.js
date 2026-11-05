@@ -127,7 +127,7 @@ export const authOptions = {
       id: "credentials",
       name: "API Key",
       credentials: {
-        apiKey: { label: "MuAPI Key", type: "password" },
+        apiKey: { label: "MiniMax API Key", type: "password" },
       },
       async authorize(credentials) {
         if (!credentials?.apiKey) {
@@ -144,7 +144,7 @@ export const authOptions = {
         // anyone who knew only the last few characters of somebody else's key
         // matched that account by email and was handed its stored key and
         // credits. A hash of the whole key cannot be collided by a suffix.
-        const identityEmail = `apikey_${sha256Hex(apiKey)}@muapi.local`;
+        const identityEmail = `apikey_${sha256Hex(apiKey)}@minimax.local`;
 
         // The ONLY lookup that grants access to an existing account is an
         // exact match on the key itself.

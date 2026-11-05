@@ -8,8 +8,7 @@
 //
 // The runtime-agnostic configuration checks live in `src/lib/secrets.js`.
 
-import { createHash, createHmac, timingSafeEqual } from "crypto";
-import { assertSecureServerConfig } from "./secrets";
+import { createHash, timingSafeEqual } from "crypto";
 
 export { assertSecureServerConfig, looksLikePlaceholder } from "./secrets";
 
@@ -35,6 +34,15 @@ export const ALLOWED_IMAGE_TYPES = [
   "image/heif",
 ];
 
+/**
+ * The image types the AI provider actually accepts as a reference image.
+ *
+ * MiniMax takes JPEG and PNG only, so this is narrower than the list above:
+ * the browser converts whatever the user picked into a JPEG before uploading,
+ * and the upload endpoint refuses anything that is still not one of these.
+ */
+export const AI_INPUT_IMAGE_TYPES = ["image/jpeg", "image/png"];
+
 /** SHA-256 of a string, hex encoded. */
 export function sha256Hex(value) {
   return createHash("sha256").update(String(value), "utf8").digest("hex");
@@ -52,34 +60,8 @@ export function timingSafeStringEqual(a, b) {
 }
 
 /**
- * Token embedded in the MuAPI callback URL. Derived from NEXTAUTH_SECRET so it
- * needs no extra environment variable, and is unguessable once that secret is
- * real (which assertSecureServerConfig guarantees before we get here).
+ * The AI provider answers in one request, so there is no callback URL and no
+ * shared token to derive any more. The old MuAPI webhook helpers
+ * (`deriveWebhookToken`, `buildMuapiWebhookUrl`, `isValidWebhookToken`) were
+ * removed with the provider they belonged to.
  */
-export function deriveWebhookToken(secret) {
-  return createHmac("sha256", secret).update("muapi-webhook:v1").digest("hex");
-}
-
-/**
- * Build the callback URL handed to MuAPI, including the shared token.
- * Returns null when the configured base URL is unusable, in which case the
- * caller should omit the webhook entirely and rely on result polling.
- */
-export function buildMuapiWebhookUrl(baseUrl) {
-  const secret = assertSecureServerConfig();
-  const token = deriveWebhookToken(secret);
-  try {
-    const url = new URL("/api/webhook/muapi", baseUrl);
-    url.searchParams.set("token", token);
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
-
-/** Verify a webhook callback token in constant time. */
-export function isValidWebhookToken(providedToken) {
-  if (typeof providedToken !== "string" || !providedToken) return false;
-  const secret = assertSecureServerConfig();
-  return timingSafeStringEqual(providedToken, deriveWebhookToken(secret));
-}

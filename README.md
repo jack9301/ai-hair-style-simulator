@@ -1,8 +1,8 @@
 # 💇 AI Hairstyle Simulator — Open-Source Virtual Hair Makeover & Style Try-On SaaS (Free YouCam Hair / HairStyle.ai Alternative)
 
-> **Try on new hairstyles and hair colors virtually before visiting the salon.** A production-ready, self-hostable Next.js SaaS boilerplate built for salons, hair stylists, fashion brands, and DTC beauty apps — replaces $20/mo hair try-on tools. A free open-source alternative to YouCam Hair, HairStyle.ai, and Hairstyle Lite — powered by the MuAPI AI engine.
+> **Try on new hairstyles and hair colors virtually before visiting the salon.** A production-ready, self-hostable Next.js SaaS boilerplate built for salons, hair stylists, fashion brands, and DTC beauty apps — replaces $20/mo hair try-on tools. A free open-source alternative to YouCam Hair, HairStyle.ai, and Hairstyle Lite — powered by the MiniMax AI engine.
 
-**Tech stack:** Next.js 14 (App Router) · Prisma · PostgreSQL · NextAuth (Google OAuth) · Stripe · Tailwind CSS · MuAPI · Webhook-backed async delivery
+**Tech stack:** Next.js 14 (App Router) · Prisma · PostgreSQL · NextAuth (Google OAuth) · Stripe · Tailwind CSS · MiniMax · Synchronous image generation
 **Use cases:** Salon client styling consultations · Virtual hair makeover apps · Personal beauty planning · Hair product marketing · Barber shop previews · Beauty influencer tools · Hair color visualization · Interactive makeover widgets
 **Use cases:** Salon client styling consultations · Virtual hair makeover tools · Personal beauty planning · Hair product marketing · Barber shop previews · Interactive makeover widgets
 
@@ -20,8 +20,8 @@ https://github.com/user-attachments/assets/6dfe24cf-ffff-4096-872a-d9c8fe0faf44
 
 ## Related Projects
 
-- [MuAPI image playground](https://muapi.ai/playground) — Try the image models used for virtual hairstyle previews.
-- [MuAPI specialized apps docs](https://muapi.ai/docs/specialized-apps) — Image transformation and enhancement workflows.
+- [MiniMax platform](https://platform.minimax.io) — Where the image model used for virtual hairstyle previews lives.
+- [MiniMax API docs](https://platform.minimax.io/docs/api-reference/image-generation-t2i) — The image generation endpoint this app calls.
 
 ## 🌐 Project Details
 
@@ -37,7 +37,7 @@ AI Hairstyle Simulator is a production-ready, highly-optimized AI web applicatio
 
 - **Production-Ready SaaS** — Complete with Google OAuth and Stripe Checkout workflows built-in.
 - **Virtual Makeover Studio** — Upload portrait face photos, select hairstyle parameters, choose hair colors, and see results instantly.
-- **Webhook-Backed AI Delivery** — MuAPI async webhook delivers results directly into the database (`/api/webhook/muapi`), keeping API routes non-blocking and preventing request timeouts.
+- **One-Request AI Delivery** — MiniMax returns the finished image in the response, so a generation is a single round trip with no callback to wait for and nothing to poll.
 - **Personal Showroom Gallery** — All generated makeovers are saved to PostgreSQL. Users can review, compare, download, and delete their designs from `/gallery`.
 - **Responsive Screen-Fitting** — Designed with a fluid layout that fits perfectly on all screens (mobile, tablet, desktop) using stacked adaptive grids on mobile and viewport-locked scrolling on desktop.
 
@@ -90,13 +90,12 @@ To successfully deploy and run, you must populate the following environment vari
 | **Database** | `DATABASE_URL` | PostgreSQL connection string (Supabase or Neon) |
 | **NextAuth / Google** | `NEXTAUTH_SECRET` | Secure random string generated via `openssl rand -base64 32` |
 | | `NEXTAUTH_URL` | Your production domain (e.g. `https://my-app.vercel.app`) |
-| | `WEBHOOK_URL` | Public URL for MuAPI async callbacks (same as `NEXTAUTH_URL` in production) |
 | | `GOOGLE_CLIENT_ID` | Get from Google Cloud Console |
 | | `GOOGLE_CLIENT_SECRET` | Get from Google Cloud Console |
 | **Stripe Billing** | `STRIPE_SECRET_KEY` | Get from Stripe Dashboard |
 | | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Get from Stripe Dashboard |
 | | `STRIPE_WEBHOOK_SECRET` | Webhook secret for resolving credit purchases |
-| **AI Generation** | `MUAPIAPP_API_KEY` | Create an account and get key from [muapi.ai](https://muapi.ai?utm_source=github&utm_medium=readme&utm_campaign=ai-hair-style-simulator) |
+| **AI Generation** | `MINIMAX_API_KEY` | Create an account and get key from [platform.minimax.io](https://platform.minimax.io) |
 
 ### 🚀 Launching on Vercel: Step-by-Step
 
@@ -107,8 +106,7 @@ To successfully deploy and run, you must populate the following environment vari
 5. **Database Push**: Run `npx prisma db push` to synchronize database models before launching.
 6. **Integrations Setup**:
    - Establish a **Google Cloud OAuth app**, enabling the callback URL: `https://your-app.vercel.app/api/auth/callback/google`
-   - Setup a **Stripe Webhook**, pointing to `https://your-app.vercel.app/api/stripe/webhook` and selecting the `checkout.session.completed` event.
-   - Register a **MuAPI Webhook** pointing to `https://your-app.vercel.app/api/webhook/muapi` to receive async generation results.
+   - Setup a **Stripe Webhook**, pointing to `https://your-app.vercel.app/api/webhook/stripe` and selecting the `checkout.session.completed` event.
 
 ---
 
@@ -120,7 +118,6 @@ Ready to iterate locally? Setup is straightforward.
 
 - Node.js (v18 or higher)
 - A local PostgreSQL instance or a free cloud Database URL.
-- ngrok (optional, for local MuAPI webhook testing)
 
 ### Setup
 
@@ -146,8 +143,6 @@ npm run dev
 ```
 
 The console should now be active on `http://localhost:3000`.
-
-> **Webhook Tip:** For local MuAPI webhook testing, run `ngrok http 3000` and set `WEBHOOK_URL` to the generated HTTPS URL in your `.env`.
 
 ---
 
@@ -176,17 +171,18 @@ ai-hair-style-simulator/
 │   │   ├── pricing/            # 4-Plan credit pricing grid ($1 = 200 credits)
 │   │   └── api/
 │   │       ├── auth/           # NextAuth handler
-│   │       ├── upload/         # MuAPI file upload proxy
-│   │       ├── generation/     # Credit deduction + MuAPI trigger endpoint
-│   │       ├── creations/      # GET / DELETE creations history (with webhook bypass sync)
-│   │       ├── webhook/muapi/  # MuAPI async webhook callback handler
-│   │       └── stripe/         # Stripe checkout creation + checkout webhook
+│   │       ├── upload/         # Photo upload endpoint (returns a base64 data: URL)
+│   │       ├── generation/     # Credit deduction + MiniMax generation endpoint
+│   │       ├── creations/      # GET / DELETE creations history
+│   │       └── webhook/stripe/ # Stripe checkout + payment webhook handler
 │   ├── components/
 │   │   ├── Providers.jsx       # NextAuth SessionProvider wrapper
 │   │   └── layout/Navbar.jsx   # Sticky header with Hamburger, Vercel Deploy & credit balance
 │   └── lib/
 │       ├── auth.js             # NextAuth config with Prisma adapter
-│       ├── config.js           # Central config mapping Google, Stripe, MuAPI keys
+│       ├── config.js           # Central config mapping Google, Stripe, MiniMax keys
+│       ├── minimax.js          # MiniMax image generation client
+│       ├── image-prepare.js    # Browser-side resize/convert of the picked photo
 │       ├── prisma.js           # Cached Prisma client singleton
 │       ├── stripe.js           # Stripe instance initializer
 │       └── services/

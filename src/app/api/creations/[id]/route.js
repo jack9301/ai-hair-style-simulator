@@ -2,7 +2,16 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
-import config from "../../../../lib/config";
+
+/**
+ * How long a creation may stay "processing" before we call it failed.
+ *
+ * The image provider answers in a single request, so a creation is finished by
+ * the time the response is sent. A row that is still "processing" long after
+ * that means the request died half-way through, and it would otherwise stay
+ * unfinished for ever.
+ */
+const PROCESSING_TIMEOUT_MS = 15 * 60 * 1000;
 
 export async function GET(req, { params }) {
   try {
@@ -21,43 +30,13 @@ export async function GET(req, { params }) {
       return new NextResponse("Not Found", { status: 404 });
     }
 
-    // Active status sync (similar to list endpoint)
-    if (creation.status === "processing" && creation.requestId && !creation.requestId.startsWith("mock_")) {
-      const apiKey = config.ai.apiKey;
-      if (apiKey && !apiKey.includes("your_") && apiKey.trim() !== "") {
-        try {
-          const checkRes = await fetch(`https://api.muapi.ai/api/v1/predictions/${creation.requestId}/result`, {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": apiKey
-            }
-          });
-
-          if (checkRes.ok) {
-            const checkData = await checkRes.json();
-            const state = checkData.status || checkData.state;
-
-            if (state === "completed" || state === "succeeded") {
-              const outputs = checkData.outputs || [];
-              const outputUrl = outputs[0] || (typeof checkData.output === 'string' ? checkData.output : checkData.output?.urls?.get);
-
-              if (outputUrl) {
-                creation = await prisma.hairStyle.update({
-                  where: { id: creation.id },
-                  data: { status: "completed", resultImage: outputUrl }
-                });
-              }
-            } else if (state === "failed") {
-              creation = await prisma.hairStyle.update({
-                where: { id: creation.id },
-                data: { status: "failed" }
-              });
-            }
-          }
-        } catch (pollErr) {
-          console.error(`Bypass single poll error for request ID ${creation.requestId}:`, pollErr);
-        }
+    if (creation.status === "processing") {
+      const started = creation.createTime ? new Date(creation.createTime).getTime() : 0;
+      if (Date.now() - started > PROCESSING_TIMEOUT_MS) {
+        creation = await prisma.hairStyle.update({
+          where: { id: creation.id },
+          data: { status: "failed" }
+        });
       }
     }
 

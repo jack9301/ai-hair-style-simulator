@@ -8,6 +8,7 @@ import {
   FaCut, FaCoins, FaCheck, FaExclamationTriangle, FaTimes, FaChevronDown
 } from "react-icons/fa";
 import clsx from "clsx";
+import { prepareImageForUpload } from "../lib/image-prepare";
 
 const GENDERS = [
   { id: "unisex", name: "Unisex / Neutral" },
@@ -39,6 +40,15 @@ const HAIR_COLORS = [
   { id: "silver", name: "Silver Grey", desc: "Trendy metallic silver" },
   { id: "purple", name: "Lavender Purple", desc: "Rich royal purple" }
 ];
+
+/**
+ * How many times we check a creation that has not come back yet.
+ *
+ * The AI provider answers in one request, so this is only a safety net for a
+ * row that is still settling. 2.5s between attempts puts the ceiling at a
+ * little over two minutes.
+ */
+const MAX_POLL_ATTEMPTS = 48;
 
 export default function StudioPage() {
   const { data: session, update: updateSession } = useSession();
@@ -137,10 +147,16 @@ export default function StudioPage() {
     }
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
 
     try {
+      // The AI provider only takes JPEG and PNG, and a phone photo is far
+      // bigger than we want to push through the API. The browser shrinks it
+      // and converts it before anything leaves the page.
+      const prepared = await prepareImageForUpload(file);
+
+      const formData = new FormData();
+      formData.append("file", prepared);
+
       const res = await fetch("/api/upload", {
         method: "POST",
         body: formData
@@ -157,6 +173,8 @@ export default function StudioPage() {
       alert(err.message || "Failed to upload image. Please try again.");
     } finally {
       setIsUploading(false);
+      // Let the same photo be picked again after a mistake.
+      if (e.target) e.target.value = "";
     }
   };
 
@@ -207,6 +225,14 @@ export default function StudioPage() {
         setResultImage(data.resultImage);
         setCreationId(data.id);
         setGeneratingStatus("success");
+      } else if (data.status === "failed") {
+        // The provider explains what went wrong — show that instead of a
+        // generic "try again".
+        setGeneratingError(
+          data.error ||
+            "AI hairstyle fitting failed. Please review your photo and try again."
+        );
+        setGeneratingStatus("error");
       } else {
         pollResult(data.id);
       }
@@ -219,8 +245,13 @@ export default function StudioPage() {
 
   const pollResult = async (id) => {
     let completed = false;
+    // The provider answers in a single request, so this is only a safety net
+    // for a creation that is still settling. Give it a couple of minutes and
+    // then stop rather than polling for ever.
+    let attempts = 0;
 
-    while (!completed) {
+    while (!completed && attempts < MAX_POLL_ATTEMPTS) {
+      attempts += 1;
       await new Promise((resolve) => setTimeout(resolve, 2500));
 
       try {
@@ -233,7 +264,10 @@ export default function StudioPage() {
             setGeneratingStatus("success");
             completed = true;
           } else if (data.status === "failed") {
-            setGeneratingError("AI hairstyle fitting failed. Please review your photo and try again.");
+            setGeneratingError(
+              data.error ||
+                "AI hairstyle fitting failed. Please review your photo and try again."
+            );
             setGeneratingStatus("error");
             completed = true;
           }
@@ -241,6 +275,13 @@ export default function StudioPage() {
       } catch (err) {
         console.error("Error polling database status:", err);
       }
+    }
+
+    if (!completed) {
+      setGeneratingError(
+        "This request is taking longer than expected. Check your gallery in a moment."
+      );
+      setGeneratingStatus("error");
     }
   };
 

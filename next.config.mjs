@@ -5,7 +5,6 @@ const nextConfig = {
     // ever switches to next/image. Listed anyway so the hosts it loads from
     // are already allowed.
     remotePatterns: [
-      { protocol: "https", hostname: "cdn.muapi.ai" },
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
     ],

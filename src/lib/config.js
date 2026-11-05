@@ -7,7 +7,6 @@ const config = {
     },
     secret: process.env.NEXTAUTH_SECRET,
     url: process.env.NEXTAUTH_URL || "http://localhost:3000",
-    webhook_url: process.env.WEBHOOK_URL || process.env.NEXTAUTH_URL || "http://localhost:3000",
   },
   stripe: {
     publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
@@ -21,7 +20,9 @@ const config = {
     }
   },
   ai: {
-    apiKey: process.env.MUAPIAPP_API_KEY,
+    // The image provider is MiniMax. The key is read from the environment on
+    // the server only — it is never exposed to the browser.
+    apiKey: process.env.MINIMAX_API_KEY,
     generationCost: 18, // Deducted per AI call
   }
 };

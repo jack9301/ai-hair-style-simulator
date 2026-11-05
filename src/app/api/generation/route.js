@@ -4,45 +4,37 @@ import { authOptions } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { UserService } from "../../../lib/services/user";
 import config from "../../../lib/config";
+import { generateHairstyleImage } from "../../../lib/minimax";
+import { looksLikePlaceholder } from "../../../lib/secrets";
 import {
   MAX_INPUT_IMAGE_LENGTH,
   MAX_PROMPT_LENGTH,
-  buildMuapiWebhookUrl,
 } from "../../../lib/security";
 
 const FALLBACK_HAIRSTYLES = [
-  "https://images.unsplash.com/photo-1595959183075-c1d09e77f050?q=80&w=800", // curly blonde
-  "https://images.unsplash.com/photo-1605497746444-051d5236a28e?q=80&w=800", // long pink
+  "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=800", // blonde bob
+  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=800", // long waves
   "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?q=80&w=800"  // short dark
 ];
 
-// Hosts we accept a remote input image from. MuAPI's CDN is the only thing
-// that should ever hand us a remote URL.
-const ALLOWED_INPUT_HOSTS = ["cdn.muapi.ai"];
-
-/** Only http(s) image URLs are ever stored or rendered. */
-function isSafeImageUrl(value) {
-  if (typeof value !== "string" || !value) return false;
-  return /^https:\/\//i.test(value) || /^data:image\//i.test(value);
-}
-
-/** The uploaded image must be an inline image or a URL on a known host. */
+/**
+ * The reference image has to be a JPEG or PNG data: URL.
+ *
+ * MiniMax takes the picture inline as base64, so there is no remote host to
+ * allow here any more — and no chance of the app being pointed at a URL
+ * somebody else controls.
+ */
 function isValidInputImage(value) {
   if (typeof value !== "string" || !value || value.length > MAX_INPUT_IMAGE_LENGTH) {
     return false;
   }
-  if (/^data:image\/(jpeg|png|webp|gif|heic|heif);base64,/i.test(value)) {
-    return true;
-  }
-  if (!/^https:\/\//i.test(value)) return false;
-  try {
-    const { hostname } = new URL(value);
-    return ALLOWED_INPUT_HOSTS.some(
-      (host) => hostname === host || hostname.endsWith(`.${host}`)
-    );
-  } catch {
-    return false;
-  }
+  return /^data:image\/(jpeg|png);base64,/i.test(value);
+}
+
+/** Only http(s) or inline image URLs are ever stored or rendered. */
+function isSafeImageUrl(value) {
+  if (typeof value !== "string" || !value) return false;
+  return /^https:\/\//i.test(value) || /^data:image\//i.test(value);
 }
 
 export async function POST(req) {
@@ -88,16 +80,15 @@ export async function POST(req) {
 
     const serverApiKey =
       typeof config.ai.apiKey === "string" ? config.ai.apiKey.trim() : "";
-    const hasServerKey = serverApiKey.length > 0 && !serverApiKey.includes("your_");
+    const hasServerKey = !looksLikePlaceholder(serverApiKey);
 
     const apiKey = usingCustomKey ? customApiKey : serverApiKey;
 
     // A request is served by the mock fallback (a stock hairstyle image) when
-    // there is no usable key to call MuAPI with. That is not a real
+    // there is no usable key to call the provider with. That is not a real
     // generation, so it must never cost the user credits — otherwise an
     // unconfigured server silently charges every user for a fake result.
-    const willUseMock =
-      !apiKey || apiKey.trim() === "" || apiKey.includes("your_");
+    const willUseMock = !usingCustomKey && !hasServerKey;
 
     const cost =
       usingCustomKey || willUseMock ? 0 : config.ai.generationCost || 18;
@@ -113,113 +104,36 @@ export async function POST(req) {
       }
     }
 
-    // 2. Submit prediction
+    // 2. Generate the image
     let resultImage = "";
     let requestId = `mock_${Date.now()}`;
     let status = "processing";
     let refunded = false;
+    let failureMessage = "";
 
     if (!willUseMock) {
-      const webhookUrl = buildMuapiWebhookUrl(config.auth.webhook_url);
-      if (!webhookUrl) {
-        console.warn(
-          "[GENERATION] WEBHOOK_URL is not a valid URL — falling back to result polling."
-        );
-      }
-
-      const submitUrl =
-        "https://api.muapi.ai/api/v1/gpt-image-2-image-to-image" +
-        (webhookUrl ? `?webhook=${encodeURIComponent(webhookUrl)}` : "");
-      const submitBody = { prompt: cleanPrompt, images_list: [inputImage] };
-      if (webhookUrl) submitBody.webhook = webhookUrl;
-
       try {
-        const submitRes = await fetch(submitUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": apiKey,
-          },
-          body: JSON.stringify(submitBody),
+        // MiniMax answers in one request — the finished image comes back in
+        // the response, so there is nothing to poll for.
+        const generated = await generateHairstyleImage({
+          apiKey,
+          prompt: cleanPrompt,
+          inputImage,
         });
 
-        if (submitRes.status === 401 || submitRes.status === 403) {
-          // The supplied key was rejected. With a custom key that means the
-          // user saved an invalid key — report it instead of quietly running
-          // their request on the server's key.
-          if (usingCustomKey) {
-            return NextResponse.json(
-              { error: "Your saved MuAPI API key was rejected. Please save a valid key." },
-              { status: 402 }
-            );
-          }
-          throw new Error("MuAPI rejected the server API key");
+        if (!isSafeImageUrl(generated.image)) {
+          throw new Error("The provider returned an unusable image reference.");
         }
 
-        if (!submitRes.ok) {
-          throw new Error(`MuAPI submission failed with status ${submitRes.status}`);
-        }
-
-        const resJson = await submitRes.json();
-        if (resJson.request_id) {
-          requestId = resJson.request_id;
-
-          // Poll for result (max 15s, checking every 2.5s)
-          let completed = false;
-          let attempts = 0;
-          const maxAttempts = 6;
-
-          while (!completed && attempts < maxAttempts) {
-            await new Promise((resolve) => setTimeout(resolve, 2500));
-            attempts++;
-
-            try {
-              const pollRes = await fetch(
-                `https://api.muapi.ai/api/v1/predictions/${requestId}/result`,
-                {
-                  method: "GET",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "x-api-key": apiKey,
-                  },
-                }
-              );
-
-              if (pollRes.ok) {
-                const pollJson = await pollRes.json();
-                const state = pollJson.status || pollJson.state;
-                if (state === "completed" || state === "succeeded") {
-                  const outputs = pollJson.outputs || [];
-                  const outputUrl =
-                    outputs[0] ||
-                    (typeof pollJson.output === "string"
-                      ? pollJson.output
-                      : pollJson.output?.urls?.get);
-
-                  if (outputUrl && isSafeImageUrl(outputUrl)) {
-                    resultImage = outputUrl;
-                    status = "completed";
-                    completed = true;
-                  }
-                } else if (state === "failed") {
-                  console.error("MuAPI generation failed:", pollJson.error);
-                  status = "failed";
-                  break;
-                }
-              }
-            } catch (pollErr) {
-              console.error("MuAPI polling error:", pollErr);
-            }
-          }
-        } else if (resJson.output && isSafeImageUrl(resJson.output)) {
-          resultImage = resJson.output;
-          status = "completed";
-        }
+        resultImage = generated.image;
+        requestId = generated.requestId;
+        status = "completed";
       } catch (err) {
-        // The request never reached a running generation, so the user got
-        // nothing. Refund the credits they were charged for.
-        console.warn("MuAPI call failed:", err.message);
+        // The request never produced an image, so the user got nothing.
+        // Refund the credits they were charged for.
+        console.warn("MiniMax generation failed:", err);
         status = "failed";
+        failureMessage = err?.message || "The image provider could not complete this request.";
         if (!usingCustomKey && cost > 0) {
           await UserService.addCredits(session.user.id, cost);
           refunded = true;
@@ -227,12 +141,10 @@ export async function POST(req) {
       }
     } else {
       // Mock mode — no usable API key, so there is nothing real to call.
-      if (!usingCustomKey && !hasServerKey) {
-        console.warn(
-          "[GENERATION] MUAPIAPP_API_KEY is missing or still a placeholder — " +
-            "serving the stock-image fallback. No credits were charged."
-        );
-      }
+      console.warn(
+        "[GENERATION] MINIMAX_API_KEY is missing or still a placeholder — " +
+          "serving the stock-image fallback. No credits were charged."
+      );
       await new Promise((resolve) => setTimeout(resolve, 3000));
       resultImage = FALLBACK_HAIRSTYLES[Math.floor(Math.random() * FALLBACK_HAIRSTYLES.length)];
       status = "completed";
@@ -254,7 +166,11 @@ export async function POST(req) {
       },
     });
 
-    return NextResponse.json(creation);
+    // A failed generation carries the reason, so the page can say what went
+    // wrong instead of "please try again".
+    return NextResponse.json(
+      status === "failed" ? { ...creation, error: failureMessage } : creation
+    );
   } catch (error) {
     console.error("[GENERATION_POST]", error);
     return new NextResponse("Internal Error", { status: 500 });

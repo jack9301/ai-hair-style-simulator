@@ -108,7 +108,7 @@ export default function GalleryPage() {
             <span>Sign in or create an account</span>
           </Link>
           <p className="mt-3 text-xs text-zinc-500">
-            Google, email address, or MuAPI key.
+            Google, email address, or MiniMax API key.
           </p>
         </div>
       </div>

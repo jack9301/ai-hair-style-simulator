@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../lib/auth";
-import config from "../../../lib/config";
-import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES } from "../../../lib/security";
+import { AI_INPUT_IMAGE_TYPES, MAX_UPLOAD_BYTES } from "../../../lib/security";
 
 // Uses `Buffer.from(...)` which is a Node API; pin to the Node runtime.
 export const runtime = "nodejs";
@@ -10,8 +9,9 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req) {
   try {
-    // Uploading spends the server's MuAPI quota, so it must not be open to
-    // anonymous callers.
+    // Uploading is free now — the image is handed straight to the AI provider
+    // with the generation request — but the endpoint still only serves
+    // signed-in users.
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json(
@@ -43,43 +43,28 @@ export async function POST(req) {
       );
     }
 
-    // Only allow image types we recognise, and use the validated type in the
-    // data: URL rather than whatever the client claimed.
+    // The AI provider takes JPEG and PNG only, so only those are accepted.
+    // The browser converts whatever the user picked into a JPEG before it
+    // gets here; this is the guard for anything that slipped past that.
     const mimeType = (file.type || "").toLowerCase();
-    if (!ALLOWED_IMAGE_TYPES.includes(mimeType)) {
+    if (!AI_INPUT_IMAGE_TYPES.includes(mimeType)) {
       return NextResponse.json(
-        { error: "Unsupported file type. Please upload a JPEG, PNG, WebP or GIF image." },
+        {
+          error:
+            "Unsupported file type. Please upload a JPEG or PNG image — most phones can save a photo as JPEG.",
+        },
         { status: 415 }
       );
     }
 
-    const apiKey = config.ai.apiKey;
-
-    if (!apiKey || apiKey.includes("your_") || apiKey.trim() === "") {
-      // Local Base64 Fallback
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      return NextResponse.json({ url: `data:${mimeType};base64,${buffer.toString("base64")}` });
-    }
-
-    const fd = new FormData();
-    fd.append("file", file);
-
-    const uploadRes = await fetch("https://api.muapi.ai/api/v1/upload_file", {
-      method: "POST",
-      headers: { "x-api-key": apiKey },
-      body: fd,
+    // The image is inlined as a data: URL rather than uploaded somewhere.
+    // MiniMax accepts a reference image as base64, so there is no need for a
+    // third party to host it for us.
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    return NextResponse.json({
+      url: `data:${mimeType};base64,${buffer.toString("base64")}`,
     });
-
-    if (!uploadRes.ok) {
-      console.warn("MuAPI upload failed, falling back to base64");
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      return NextResponse.json({ url: `data:${mimeType};base64,${buffer.toString("base64")}` });
-    }
-
-    const result = await uploadRes.json();
-    return NextResponse.json({ url: result.url || result.file_url || result.data?.url });
   } catch (error) {
     console.error("[UPLOAD_POST]", error);
     return new NextResponse("Internal Error", { status: 500 });

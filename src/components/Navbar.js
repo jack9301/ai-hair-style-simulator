@@ -342,19 +342,19 @@ export default function Navbar() {
             </div>
 
             <p className="text-xs text-secondary-text leading-relaxed">
-              Use your own <strong>MuAPI Key</strong> to try on hair styles directly without consuming or purchasing website credits.
+              Use your own <strong>MiniMax API Key</strong> to try on hair styles directly without consuming or purchasing website credits.
             </p>
 
             <form onSubmit={handleSaveApiKey} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="block text-[11px] uppercase font-bold text-secondary-text tracking-wider">
-                  MuAPI Secret Key
+                  MiniMax API Key
                 </label>
                 <input
                   type="password"
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder="mu_..."
+                  placeholder="Paste your MiniMax API key"
                   className="w-full bg-bg-page border border-divider rounded-lg px-3.5 py-2.5 text-xs text-white placeholder-secondary-text/50 focus:outline-none focus:border-amber-400 transition-colors"
                 />
               </div>

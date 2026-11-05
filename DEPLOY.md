@@ -14,7 +14,7 @@ This guide takes you from a fresh fork to a live site on **Vercel**, with **Supa
 - A **Supabase account** (free tier): https://supabase.com — for the Postgres database
 - A **Google Cloud Console** project with OAuth credentials (for sign-in)
 - A **Stripe** account in test mode
-- A **MuAPI account**: https://muapi.ai — for the AI image generation API
+- A **MiniMax account**: https://platform.minimax.io — for the AI image generation API
 
 ---
 
@@ -99,17 +99,16 @@ Re-run `npx prisma db push` after every change to `prisma/schema.prisma` — inc
    | `DATABASE_URL` | The Supabase transaction pooler URL from §1 |
    | `NEXTAUTH_SECRET` | `openssl rand -base64 32` |
    | `NEXTAUTH_URL` | `https://YOUR-DOMAIN` (no trailing slash) |
-   | `WEBHOOK_URL` | `https://YOUR-DOMAIN` — where MuAPI posts back |
    | `GOOGLE_CLIENT_ID` | Google Cloud console (§3) |
    | `GOOGLE_CLIENT_SECRET` | Google Cloud console (§3) |
    | `STRIPE_SECRET_KEY` | Stripe dashboard (§4) |
    | `STRIPE_WEBHOOK_SECRET` | Stripe webhook endpoint (§4) |
    | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe dashboard (§4) |
-   | `MUAPIAPP_API_KEY` | https://muapi.ai |
+   | `MINIMAX_API_KEY` | https://platform.minimax.io |
 
    > ⚠️ `NEXTAUTH_SECRET` must be a real random value. A placeholder makes every session cookie forgeable, and the app **refuses to serve traffic** until it is set — that check runs at startup via `src/instrumentation.js`.
    >
-   > ⚠️ `MUAPIAPP_API_KEY` must be real too. While it is a placeholder, generations silently fall back to stock images (and are not charged, deliberately).
+   > ⚠️ `MINIMAX_API_KEY` must be real too. While it is a placeholder, generations silently fall back to stock images (and are not charged, deliberately).
 
 4. Click **Deploy**. The first build takes a few minutes.
 
@@ -123,7 +122,7 @@ Vercel gives you a domain like `ai-hair-style-simulator-rho.vercel.app` (or your
    `https://YOUR-DOMAIN/api/auth/callback/google` to the redirect URIs.
 2. Go back to **Stripe → Webhooks** and set the endpoint URL to
    `https://YOUR-DOMAIN/api/webhook/stripe`.
-3. In Vercel, update `NEXTAUTH_URL` and `WEBHOOK_URL` to `https://YOUR-DOMAIN` and redeploy.
+3. In Vercel, update `NEXTAUTH_URL` to `https://YOUR-DOMAIN` and redeploy.
 
 ---
 
@@ -152,7 +151,7 @@ To deploy a change without touching `main`, push a branch and open a pull reques
 
 ### Environment variables locally
 
-Keep your local `.env` in sync with the Vercel dashboard. `.env` is gitignored, so it never leaves your machine. `NEXTAUTH_URL` and `WEBHOOK_URL` should point at `http://localhost:3000` locally.
+Keep your local `.env` in sync with the Vercel dashboard. `.env` is gitignored, so it never leaves your machine. `NEXTAUTH_URL` should point at `http://localhost:3000` locally.
 
 ---
 
